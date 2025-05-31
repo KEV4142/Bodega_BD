@@ -1,7 +1,8 @@
---CREATE DATABASE Bodega;
+CREATE DATABASE Bodega;
+GO
 USE Bodega;
 GO
---DROP DATABASE Bodega;
+
 CREATE TABLE Sucursales(
     SucursalID INT IDENTITY(1,1) NOT NULL,
     Descripcion VARCHAR(100) NOT NULL,
@@ -19,10 +20,11 @@ CREATE TABLE Lotes (
     LoteID INT IDENTITY(1,1) NOT NULL,
     ProductoID INT NOT NULL,
     FechaVencimiento    DATE NOT NULL,
-    Costo DECIMAL(5,2) NOT NULL DEFAULT '0.00',
+    Costo DECIMAL(5,2) NOT NULL,
     Cantidad    INT NOT NULL DEFAULT 0
 );
 GO
+
 CREATE TABLE SalidaEnc (
     SalidaID INT IDENTITY(1,1) NOT NULL,
     SucursalID INT NOT NULL,
@@ -34,10 +36,10 @@ CREATE TABLE SalidaEnc (
 );
 GO
 CREATE TABLE SalidaDet (
-	SalidaDetID INT IDENTITY(1,1) NOT NULL,
 	SalidaID INT NOT NULL,
 	LoteID INT NOT NULL,
-	Cantidad    INT NOT NULL
+	Cantidad    INT NOT NULL,
+	Costo DECIMAL(5,2) NOT NULL
 );
 GO
 -- constraints
@@ -50,7 +52,7 @@ ALTER TABLE Lotes ADD CONSTRAINT pkLotesID PRIMARY KEY(LoteID);
 GO
 ALTER TABLE SalidaEnc ADD CONSTRAINT pkSalidaEncID PRIMARY KEY(SalidaID);
 GO
-ALTER TABLE SalidaDet ADD CONSTRAINT pkSalidaDetID PRIMARY KEY(SalidaDetID);
+ALTER TABLE SalidaDet ADD CONSTRAINT pkSalidaDetID PRIMARY KEY(SalidaID, LoteID);
 GO
 
 --llave foranea
@@ -61,6 +63,8 @@ GO
 ALTER TABLE SalidaDet ADD CONSTRAINT fkSalidaDetSalidaID FOREIGN KEY (SalidaID) REFERENCES SalidaEnc(SalidaID);
 GO
 ALTER TABLE SalidaDet ADD CONSTRAINT fkSalidaDetLoteID FOREIGN KEY (LoteID) REFERENCES Lotes(LoteID);
+
+-- Constraint Check
 GO
 ALTER TABLE Productos ADD CONSTRAINT ckProductosEstado CHECK (estado IN('A','I','B'));
 GO
@@ -68,8 +72,18 @@ ALTER TABLE Sucursales ADD CONSTRAINT ckSucursalesEstado CHECK (Estado IN('A','I
 GO
 ALTER TABLE SalidaEnc ADD CONSTRAINT ckSalidaEncEstado CHECK (Estado IN('E','R','B'));
 GO
+ALTER TABLE Lotes ADD CONSTRAINT ckLotesCantidad CHECK (Cantidad>-1);
+GO
+ALTER TABLE Lotes ADD CONSTRAINT ckLotesCosto CHECK (Costo>0);
+GO
+ALTER TABLE SalidaDet ADD CONSTRAINT ckSalidaDetCantidad CHECK (Cantidad>0);
+GO
+ALTER TABLE SalidaDet ADD CONSTRAINT ckSalidaDetCosto CHECK (Costo>0);
+GO
+ALTER TABLE SalidaEnc ADD CONSTRAINT ckSalidaEncFechaRecibido CHECK (FechaRecibido IS NULL OR Fecha < FechaRecibido);
+GO
 
-
+-- Identity
 
 SET ANSI_NULLS ON
 GO
@@ -77,7 +91,9 @@ SET QUOTED_IDENTIFIER ON
 GO
 CREATE TABLE [dbo].[AspNetUsers](
 	[Id] [nvarchar](450) NOT NULL,
-	[NombreCompleto] [nvarchar](max) NULL,
+	[NombreCompleto] [nvarchar](max) NOT NULL,
+	[RoleId] [nvarchar](450) NULL,
+	[Estado] [varchar](1) NOT NULL,
 	[UserName] [nvarchar](256) NULL,
 	[NormalizedUserName] [nvarchar](256) NULL,
 	[Email] [nvarchar](256) NULL,
@@ -110,6 +126,13 @@ CREATE NONCLUSTERED INDEX [EmailIndex] ON [dbo].[AspNetUsers]
 GO
 SET ANSI_PADDING ON
 GO
+CREATE NONCLUSTERED INDEX [IX_AspNetUsers_RoleId] ON [dbo].[AspNetUsers]
+(
+	[RoleId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
 CREATE UNIQUE NONCLUSTERED INDEX [UserNameIndex] ON [dbo].[AspNetUsers]
 (
 	[NormalizedUserName] ASC
@@ -117,52 +140,16 @@ CREATE UNIQUE NONCLUSTERED INDEX [UserNameIndex] ON [dbo].[AspNetUsers]
 WHERE ([NormalizedUserName] IS NOT NULL)
 WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 GO
-
-CREATE TABLE [dbo].[AspNetUserTokens](
-	[UserId] [nvarchar](450) NOT NULL,
-	[LoginProvider] [nvarchar](450) NOT NULL,
-	[Name] [nvarchar](450) NOT NULL,
-	[Value] [nvarchar](max) NULL
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+ALTER TABLE [dbo].[AspNetUsers] ADD  DEFAULT ('A') FOR [Estado]
 GO
-SET ANSI_PADDING ON
+ALTER TABLE [dbo].[AspNetUsers]  WITH CHECK ADD  CONSTRAINT [FK_AspNetUsers_AspNetRoles_RoleId] FOREIGN KEY([RoleId])
+REFERENCES [dbo].[AspNetRoles] ([Id])
 GO
-ALTER TABLE [dbo].[AspNetUserTokens] ADD  CONSTRAINT [PK_AspNetUserTokens] PRIMARY KEY CLUSTERED 
-(
-	[UserId] ASC,
-	[LoginProvider] ASC,
-	[Name] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+ALTER TABLE [dbo].[AspNetUsers] CHECK CONSTRAINT [FK_AspNetUsers_AspNetRoles_RoleId]
 GO
-ALTER TABLE [dbo].[AspNetUserTokens]  WITH CHECK ADD  CONSTRAINT [FK_AspNetUserTokens_AspNetUsers_UserId] FOREIGN KEY([UserId])
-REFERENCES [dbo].[AspNetUsers] ([Id])
-ON DELETE CASCADE
+ALTER TABLE [dbo].[AspNetUsers]  WITH CHECK ADD  CONSTRAINT [ckUsuarioEstado] CHECK  (([Estado]='B' OR [Estado]='I' OR [Estado]='A'))
 GO
-ALTER TABLE [dbo].[AspNetUserTokens] CHECK CONSTRAINT [FK_AspNetUserTokens_AspNetUsers_UserId]
-GO
-
-CREATE TABLE [dbo].[AspNetRoles](
-	[Id] [nvarchar](450) NOT NULL,
-	[Name] [nvarchar](256) NULL,
-	[NormalizedName] [nvarchar](256) NULL,
-	[ConcurrencyStamp] [nvarchar](max) NULL
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
-GO
-SET ANSI_PADDING ON
-GO
-ALTER TABLE [dbo].[AspNetRoles] ADD  CONSTRAINT [PK_AspNetRoles] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-GO
-SET ANSI_PADDING ON
-GO
-CREATE UNIQUE NONCLUSTERED INDEX [RoleNameIndex] ON [dbo].[AspNetRoles]
-(
-	[NormalizedName] ASC
-)
-WHERE ([NormalizedName] IS NOT NULL)
-WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+ALTER TABLE [dbo].[AspNetUsers] CHECK CONSTRAINT [ckUsuarioEstado]
 GO
 
 CREATE TABLE [dbo].[AspNetUserRoles](
@@ -227,32 +214,6 @@ GO
 ALTER TABLE [dbo].[AspNetUserLogins] CHECK CONSTRAINT [FK_AspNetUserLogins_AspNetUsers_UserId]
 GO
 
-CREATE TABLE [dbo].[AspNetRoleClaims](
-	[Id] [int] IDENTITY(1,1) NOT NULL,
-	[RoleId] [nvarchar](450) NOT NULL,
-	[ClaimType] [nvarchar](max) NULL,
-	[ClaimValue] [nvarchar](max) NULL
-) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
-GO
-ALTER TABLE [dbo].[AspNetRoleClaims] ADD  CONSTRAINT [PK_AspNetRoleClaims] PRIMARY KEY CLUSTERED 
-(
-	[Id] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-GO
-SET ANSI_PADDING ON
-GO
-CREATE NONCLUSTERED INDEX [IX_AspNetRoleClaims_RoleId] ON [dbo].[AspNetRoleClaims]
-(
-	[RoleId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
-GO
-ALTER TABLE [dbo].[AspNetRoleClaims]  WITH CHECK ADD  CONSTRAINT [FK_AspNetRoleClaims_AspNetRoles_RoleId] FOREIGN KEY([RoleId])
-REFERENCES [dbo].[AspNetRoles] ([Id])
-ON DELETE CASCADE
-GO
-ALTER TABLE [dbo].[AspNetRoleClaims] CHECK CONSTRAINT [FK_AspNetRoleClaims_AspNetRoles_RoleId]
-GO
-
 CREATE TABLE [dbo].[AspNetUserClaims](
 	[Id] [int] IDENTITY(1,1) NOT NULL,
 	[UserId] [nvarchar](450) NOT NULL,
@@ -277,6 +238,56 @@ REFERENCES [dbo].[AspNetUsers] ([Id])
 ON DELETE CASCADE
 GO
 ALTER TABLE [dbo].[AspNetUserClaims] CHECK CONSTRAINT [FK_AspNetUserClaims_AspNetUsers_UserId]
+GO
+
+CREATE TABLE [dbo].[AspNetRoles](
+	[Id] [nvarchar](450) NOT NULL,
+	[Name] [nvarchar](256) NULL,
+	[NormalizedName] [nvarchar](256) NULL,
+	[ConcurrencyStamp] [nvarchar](max) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+ALTER TABLE [dbo].[AspNetRoles] ADD  CONSTRAINT [PK_AspNetRoles] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+CREATE UNIQUE NONCLUSTERED INDEX [RoleNameIndex] ON [dbo].[AspNetRoles]
+(
+	[NormalizedName] ASC
+)
+WHERE ([NormalizedName] IS NOT NULL)
+WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+
+CREATE TABLE [dbo].[AspNetRoleClaims](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[RoleId] [nvarchar](450) NOT NULL,
+	[ClaimType] [nvarchar](max) NULL,
+	[ClaimValue] [nvarchar](max) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+ALTER TABLE [dbo].[AspNetRoleClaims] ADD  CONSTRAINT [PK_AspNetRoleClaims] PRIMARY KEY CLUSTERED 
+(
+	[Id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+CREATE NONCLUSTERED INDEX [IX_AspNetRoleClaims_RoleId] ON [dbo].[AspNetRoleClaims]
+(
+	[RoleId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+ALTER TABLE [dbo].[AspNetRoleClaims]  WITH CHECK ADD  CONSTRAINT [FK_AspNetRoleClaims_AspNetRoles_RoleId] FOREIGN KEY([RoleId])
+REFERENCES [dbo].[AspNetRoles] ([Id])
+ON DELETE CASCADE
+GO
+ALTER TABLE [dbo].[AspNetRoleClaims] CHECK CONSTRAINT [FK_AspNetRoleClaims_AspNetRoles_RoleId]
 GO
 
 ALTER TABLE SalidaEnc ADD CONSTRAINT fkSalidaEncUsuarioID FOREIGN KEY(UsuarioID) REFERENCES AspNetUsers(Id);
@@ -318,3 +329,12 @@ VALUES
 (3,'2025-11-1',25,0),
 (3,'2025-12-1',25,100);
 GO
+
+
+/*USE master;
+GO
+ALTER DATABASE Bodega SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+GO
+DROP DATABASE Bodega;
+GO*/
+
