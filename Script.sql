@@ -21,7 +21,8 @@ CREATE TABLE Lotes (
     ProductoID INT NOT NULL,
     FechaVencimiento    DATE NOT NULL,
     Costo DECIMAL(5,2) NOT NULL,
-    Cantidad    INT NOT NULL DEFAULT 0
+    Cantidad    INT NOT NULL DEFAULT 0,
+    CampoConcurrencia ROWVERSION NOT NULL  
 );
 GO
 
@@ -337,4 +338,5 @@ ALTER DATABASE Bodega SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
 GO
 DROP DATABASE Bodega;
 GO*/
+
 
